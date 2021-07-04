@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+</head>
+<body>
+  <div id="app">
+    <v-app>
+        <v-app-bar app></v-app-bar>
+      <v-main>
+          <v-data-table
+            :items="devices"
+            :headers="headers"
+            show-expand
+            item-key="host"
+          >
+            <template v-slot:expanded-item="{ headers, item }">
+                <v-list dense>
+                    <v-list-item v-for="(detail) in item.details">
+                        <v-list-item-content>
+                            <v-list-item-title>
+                                {{detail}}
+                            </v-list-item-title>
+                        </v-list-item-content>
+                    </v-list-item>
+                </v-list>
+            </template>
+          </v-data-table>
+        <button @click="updateDevice">Test</button>
+      </v-main>
+    </v-app>
+  </div>
+  <script src="https://cdn.socket.io/3.1.3/socket.io.min.js" integrity="sha384-cPwlPLvBTa3sKAgddT6krw0cJat7egBga3DJepJyrLl4Q9/5WLra3rrnMcyTyOnh" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+  <script>
+        const socket = io.connect("http://localhost:8080/iot")
+        
+        function extract(arg) {
+            return Object.keys(arg).reduce((acc, curr) => {
+                acc.push({"host": curr, "name": arg[curr]['name'], "details": Object.entries(arg[curr])})
+                console.log(acc)
+                return acc
+            }, [])
+        }
+
+
+        let app = new Vue({
+          el: '#app',
+          vuetify: new Vuetify(),
+          data: {
+              devices: [],
+              headers: [
+                 { "text": "Name", "value": "name" },
+                 { "text": "Host", "value": "host" },
+              ]
+          },
+          created() {
+            this.getDevices()
+          },
+          methods: {
+              async updateDevice() {
+                  let devices = await socket.emit("updateDevice", {"host": "192.168.0.234", "actions": { "turn_off": true}})
+              },
+              async getDevices() {
+                  let response = await (await fetch("http://localhost:8080/devices")).json()
+                  this.devices = extract(response)
+              }
+          }
+        })
+
+        socket.on("devicesUpdated", (arg) => {
+            app._data.devices = extract(arg)
+            console.log(app._data.devices)
+            console.log(arg)
+        })
+  </script>
+</body>
+</html>
